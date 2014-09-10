@@ -1,7 +1,8 @@
 /* Slider
 ================================================================================ */
 /**
- * Parent for seek bar and volume slider
+ * The base functionality for sliders like the volume bar and seek bar
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
@@ -15,8 +16,6 @@ vjs.Slider = vjs.Component.extend({
     this.bar = this.getChild(this.options_['barName']);
     this.handle = this.getChild(this.options_['handleName']);
 
-    player.on(this.playerEvent, vjs.bind(this, this.update));
-
     this.on('mousedown', this.onMouseDown);
     this.on('touchstart', this.onMouseDown);
     this.on('focus', this.onFocus);
@@ -25,12 +24,13 @@ vjs.Slider = vjs.Component.extend({
 
     this.player_.on('controlsvisible', vjs.bind(this, this.update));
 
-    // This is actually to fix the volume handle position. http://twitter.com/#!/gerritvanaaken/status/159046254519787520
-    // this.player_.one('timeupdate', vjs.bind(this, this.update));
-
-    player.ready(vjs.bind(this, this.update));
+    player.on(this.playerEvent, vjs.bind(this, this.update));
 
     this.boundEvents = {};
+
+
+    this.boundEvents.move = vjs.bind(this, this.onMouseMove);
+    this.boundEvents.end = vjs.bind(this, this.onMouseUp);
   }
 });
 
@@ -39,7 +39,7 @@ vjs.Slider.prototype.createEl = function(type, props) {
   // Add the slider element class to all sub classes
   props.className = props.className + ' vjs-slider';
   props = vjs.obj.merge({
-    role: 'slider',
+    'role': 'slider',
     'aria-valuenow': 0,
     'aria-valuemin': 0,
     'aria-valuemax': 100,
@@ -52,9 +52,7 @@ vjs.Slider.prototype.createEl = function(type, props) {
 vjs.Slider.prototype.onMouseDown = function(event){
   event.preventDefault();
   vjs.blockTextSelection();
-
-  this.boundEvents.move = vjs.bind(this, this.onMouseMove);
-  this.boundEvents.end = vjs.bind(this, this.onMouseUp);
+  this.addClass('vjs-sliding');
 
   vjs.on(document, 'mousemove', this.boundEvents.move);
   vjs.on(document, 'mouseup', this.boundEvents.end);
@@ -64,8 +62,13 @@ vjs.Slider.prototype.onMouseDown = function(event){
   this.onMouseMove(event);
 };
 
+// To be overridden by a subclass
+vjs.Slider.prototype.onMouseMove = function(){};
+
 vjs.Slider.prototype.onMouseUp = function() {
   vjs.unblockTextSelection();
+  this.removeClass('vjs-sliding');
+
   vjs.off(document, 'mousemove', this.boundEvents.move, false);
   vjs.off(document, 'mouseup', this.boundEvents.end, false);
   vjs.off(document, 'touchmove', this.boundEvents.move, false);
@@ -121,7 +124,9 @@ vjs.Slider.prototype.update = function(){
   }
 
   // Set the new bar width
-  bar.el().style.width = vjs.round(barProgress * 100, 2) + '%';
+  if (bar) {
+    bar.el().style.width = vjs.round(barProgress * 100, 2) + '%';
+  }
 };
 
 vjs.Slider.prototype.calculateDistance = function(event){
@@ -132,7 +137,7 @@ vjs.Slider.prototype.calculateDistance = function(event){
   boxW = boxH = el.offsetWidth;
   handle = this.handle;
 
-  if (this.options_.vertical) {
+  if (this.options()['vertical']) {
     boxY = box.top;
 
     if (event.changedTouches) {
@@ -178,10 +183,10 @@ vjs.Slider.prototype.onFocus = function(){
 };
 
 vjs.Slider.prototype.onKeyPress = function(event){
-  if (event.which == 37) { // Left Arrow
+  if (event.which == 37 || event.which == 40) { // Left and Down Arrows
     event.preventDefault();
     this.stepBack();
-  } else if (event.which == 39) { // Right Arrow
+  } else if (event.which == 38 || event.which == 39) { // Up and Right Arrows
     event.preventDefault();
     this.stepForward();
   }
@@ -212,7 +217,9 @@ vjs.SliderHandle = vjs.Component.extend();
 
 /**
  * Default value of the slider
+ *
  * @type {Number}
+ * @private
  */
 vjs.SliderHandle.prototype.defaultValue = 0;
 

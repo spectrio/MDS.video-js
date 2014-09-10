@@ -12,9 +12,9 @@ vjs.MediaFaker = vjs.MediaTechController.extend({
   }
 });
 
-// Support everything
+// Support everything except for "video/unsupported-format"
 vjs.MediaFaker.isSupported = function(){ return true; };
-vjs.MediaFaker.canPlaySource = function(srcObj){ return true; };
+vjs.MediaFaker.canPlaySource = function(srcObj){ return srcObj.type !== 'video/unsupported-format'; };
 
 vjs.MediaFaker.prototype.createEl = function(){
   var el = vjs.MediaTechController.prototype.createEl.call(this, 'div', {
@@ -30,9 +30,20 @@ vjs.MediaFaker.prototype.createEl = function(){
   return el;
 };
 
+// fake a poster attribute to mimic the video element
+vjs.MediaFaker.prototype.poster = function(){ return this.el().poster; };
+vjs.MediaFaker.prototype['setPoster'] = function(val){ this.el().poster = val; };
+
 vjs.MediaFaker.prototype.currentTime = function(){ return 0; };
+vjs.MediaFaker.prototype.seeking = function(){ return false; };
+vjs.MediaFaker.prototype.src = function(){ return 'movie.mp4'; };
 vjs.MediaFaker.prototype.volume = function(){ return 0; };
 vjs.MediaFaker.prototype.muted = function(){ return false; };
+vjs.MediaFaker.prototype.pause = function(){ return false; };
+vjs.MediaFaker.prototype.paused = function(){ return true; };
+vjs.MediaFaker.prototype.supportsFullScreen = function(){ return false; };
+vjs.MediaFaker.prototype.buffered = function(){ return {}; };
+vjs.MediaFaker.prototype.duration = function(){ return {}; };
 
 // Export vars for Closure Compiler
 vjs['MediaFaker'] = vjs.MediaFaker;

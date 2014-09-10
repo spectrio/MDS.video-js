@@ -11,10 +11,15 @@
  * and adds a generic handler to the element's event,
  * along with a unique id (guid) to the element.
  * @param  {Element|Object}   elem Element or object to bind listeners to
- * @param  {String}   type Type of event to bind to.
+ * @param  {String|Array}   type Type of event to bind to.
  * @param  {Function} fn   Event listener.
+ * @private
  */
 vjs.on = function(elem, type, fn){
+  if (vjs.obj.isArray(type)) {
+    return _handleMultipleEvents(vjs.on, elem, type, fn);
+  }
+
   var data = vjs.getData(elem);
 
   // We need a place to store all our handler data
@@ -52,9 +57,9 @@ vjs.on = function(elem, type, fn){
   }
 
   if (data.handlers[type].length == 1) {
-    if (document.addEventListener) {
+    if (elem.addEventListener) {
       elem.addEventListener(type, data.dispatcher, false);
-    } else if (document.attachEvent) {
+    } else if (elem.attachEvent) {
       elem.attachEvent('on' + type, data.dispatcher);
     }
   }
@@ -63,8 +68,9 @@ vjs.on = function(elem, type, fn){
 /**
  * Removes event listeners from an element
  * @param  {Element|Object}   elem Object to remove listeners from
- * @param  {String=}   type Type of listener to remove. Don't include to remove all events from element.
+ * @param  {String|Array=}   type Type of listener to remove. Don't include to remove all events from element.
  * @param  {Function} fn   Specific listener to remove. Don't incldue to remove listeners for an event type.
+ * @private
  */
 vjs.off = function(elem, type, fn) {
   // Don't want to add a cache object through getData if not needed
@@ -74,6 +80,10 @@ vjs.off = function(elem, type, fn) {
 
   // If no events exist, nothing to unbind
   if (!data.handlers) { return; }
+
+  if (vjs.obj.isArray(type)) {
+    return _handleMultipleEvents(vjs.off, elem, type, fn);
+  }
 
   // Utility function
   var removeType = function(t){
@@ -114,6 +124,7 @@ vjs.off = function(elem, type, fn) {
  * Clean up the listener cache and dispatchers
  * @param  {Element|Object} elem Element to clean up
  * @param  {String} type Type of event to clean up
+ * @private
  */
 vjs.cleanUpEvents = function(elem, type) {
   var data = vjs.getData(elem);
@@ -125,9 +136,9 @@ vjs.cleanUpEvents = function(elem, type) {
     // Setting to null was causing an error with data.handlers
 
     // Remove the meta-handler from the element
-    if (document.removeEventListener) {
+    if (elem.removeEventListener) {
       elem.removeEventListener(type, data.dispatcher, false);
-    } else if (document.detachEvent) {
+    } else if (elem.detachEvent) {
       elem.detachEvent('on' + type, data.dispatcher);
     }
   }
@@ -153,6 +164,7 @@ vjs.cleanUpEvents = function(elem, type) {
  * Fix a native event to have standard property values
  * @param  {Object} event Event object to fix
  * @return {Object}
+ * @private
  */
 vjs.fixEvent = function(event) {
 
@@ -174,7 +186,15 @@ vjs.fixEvent = function(event) {
     //  which makes copying more difficult.
     // TODO: Probably best to create a whitelist of event props
     for (var key in old) {
-      event[key] = old[key];
+      // Safari 6.0.3 warns you if you try to copy deprecated layerX/Y
+      // Chrome warns you if you try to copy deprecated keyboardEvent.keyLocation
+      if (key !== 'layerX' && key !== 'layerY' && key !== 'keyboardEvent.keyLocation') {
+        // Chrome 32+ warns if you try to copy deprecated returnValue, but
+        // we still want to if preventDefault isn't supported (IE8).
+        if (!(key == 'returnValue' && old.preventDefault)) {
+          event[key] = old[key];
+        }
+      }
     }
 
     // The event occurred on this element
@@ -194,9 +214,11 @@ vjs.fixEvent = function(event) {
       }
       event.returnValue = false;
       event.isDefaultPrevented = returnTrue;
+      event.defaultPrevented = true;
     };
 
     event.isDefaultPrevented = returnFalse;
+    event.defaultPrevented = false;
 
     // Stop the event from bubbling
     event.stopPropagation = function () {
@@ -250,8 +272,9 @@ vjs.fixEvent = function(event) {
 
 /**
  * Trigger an event for an element
- * @param  {Element|Object} elem  Element to trigger an event on
- * @param  {String} event Type of event to trigger
+ * @param  {Element|Object}      elem  Element to trigger an event on
+ * @param  {Event|Object|String} event A string (the type) or an event object with a type attribute
+ * @private
  */
 vjs.trigger = function(elem, event) {
   // Fetches element data and a reference to the parent (for bubbling).
@@ -274,12 +297,13 @@ vjs.trigger = function(elem, event) {
     elemData.dispatcher.call(elem, event);
   }
 
-  // Unless explicitly stopped, recursively calls this function to bubble the event up the DOM.
-  if (parent && !event.isPropagationStopped()) {
+  // Unless explicitly stopped or the event does not bubble (e.g. media events)
+    // recursively calls this function to bubble the event up the DOM.
+    if (parent && !event.isPropagationStopped() && event.bubbles !== false) {
     vjs.trigger(parent, event);
 
   // If at the top of the DOM, triggers the default action unless disabled.
-  } else if (!parent && !event.isDefaultPrevented()) {
+  } else if (!parent && !event.defaultPrevented) {
     var targetData = vjs.getData(event.target);
 
     // Checks if the target has a default action for this event.
@@ -296,7 +320,7 @@ vjs.trigger = function(elem, event) {
   }
 
   // Inform the triggerer if the default was prevented by returning false
-  return !event.isDefaultPrevented();
+  return !event.defaultPrevented;
   /* Original version of js ninja events wasn't complete.
    * We've since updated to the latest version, but keeping this around
    * for now just in case.
@@ -321,13 +345,33 @@ vjs.trigger = function(elem, event) {
 /**
  * Trigger a listener only once for an event
  * @param  {Element|Object}   elem Element or object to
- * @param  {[type]}   type [description]
- * @param  {Function} fn   [description]
- * @return {[type]}
+ * @param  {String|Array}   type
+ * @param  {Function} fn
+ * @private
  */
 vjs.one = function(elem, type, fn) {
-  vjs.on(elem, type, function(){
-    vjs.off(elem, type, arguments.callee);
+  if (vjs.obj.isArray(type)) {
+    return _handleMultipleEvents(vjs.one, elem, type, fn);
+  }
+  var func = function(){
+    vjs.off(elem, type, func);
     fn.apply(this, arguments);
-  });
+  };
+  // copy the guid to the new function so it can removed using the original function's ID
+  func.guid = fn.guid = fn.guid || vjs.guid++;
+  vjs.on(elem, type, func);
 };
+
+/**
+ * Loops through an array of event types and calls the requested method for each type.
+ * @param  {Function} fn   The event method we want to use.
+ * @param  {Element|Object} elem Element or object to bind listeners to
+ * @param  {String}   type Type of event to bind to.
+ * @param  {Function} callback   Event listener.
+ * @private
+ */
+function _handleMultipleEvents(fn, elem, type, callback) {
+  vjs.arr.forEach(type, function(type) {
+    fn(elem, type, callback); //Call the event method for each one of the types
+  });
+}

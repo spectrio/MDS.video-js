@@ -4,10 +4,15 @@
   <meta charset="utf-8" />
   <title>Video.js Sandbox</title>
 
-  <link href="../src/css/video-js.css" rel="stylesheet" type="text/css">
+  <link href="../build/files/video-js.css" rel="stylesheet" type="text/css">
 
   <!-- LOAD VIDEO.JS SOURCE FILES IN ORDER -->
   <script src="../build/source-loader.js"></script>
+
+  <!-- Set the location of the flash SWF -->
+  <script>
+    vjs.options.flash.swf = '../node_modules/videojs-swf/dist/video-js.swf'
+  </script>
 
 </head>
 <body>
@@ -19,7 +24,8 @@
     <source src="http://video-js.zencoder.com/oceans-clip.mp4" type='video/mp4'>
     <source src="http://video-js.zencoder.com/oceans-clip.webm" type='video/webm'>
     <source src="http://video-js.zencoder.com/oceans-clip.ogv" type='video/ogg'>
-    <p>Video Playback Not Supported</p>
+    <track kind="captions" src="../build/demo-files/demo.captions.vtt" srclang="en" label="English"></track><!-- Tracks need an ending tag thanks to IE9 -->
+    <p class="vjs-no-js">To view this video please enable JavaScript, and consider upgrading to a web browser that <a href="http://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a></p>
   </video>
 
   <script>

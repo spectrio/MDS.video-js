@@ -1,5 +1,7 @@
 /**
- * Seek, Load Progress, and Play Progress
+ * The Progress Control component contains the seek bar, load progress,
+ * and play progress
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
@@ -25,6 +27,7 @@ vjs.ProgressControl.prototype.createEl = function(){
 
 /**
  * Seek Bar and holder for the progress bars
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
@@ -104,9 +107,9 @@ vjs.SeekBar.prototype.stepBack = function(){
   this.player_.currentTime(this.player_.currentTime() - 5); // more quickly rewind for keyboard-only users
 };
 
-
 /**
- * Shows load progres
+ * Shows load progress
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
@@ -122,17 +125,49 @@ vjs.LoadProgressBar = vjs.Component.extend({
 vjs.LoadProgressBar.prototype.createEl = function(){
   return vjs.Component.prototype.createEl.call(this, 'div', {
     className: 'vjs-load-progress',
-    innerHTML: '<span class="vjs-control-text">Loaded: 0%</span>'
+    innerHTML: '<span class="vjs-control-text"><span>' + this.localize('Loaded') + '</span>: 0%</span>'
   });
 };
 
 vjs.LoadProgressBar.prototype.update = function(){
-  if (this.el_.style) { this.el_.style.width = vjs.round(this.player_.bufferedPercent() * 100, 2) + '%'; }
-};
+  var i, start, end, part,
+      buffered = this.player_.buffered(),
+      duration = this.player_.duration(),
+      bufferedEnd = this.player_.bufferedEnd(),
+      children = this.el_.children,
+      // get the percent width of a time compared to the total end
+      percentify = function (time, end){
+        var percent = (time / end) || 0; // no NaN
+        return (percent * 100) + '%';
+      };
 
+  // update the width of the progress bar
+  this.el_.style.width = percentify(bufferedEnd, duration);
+
+  // add child elements to represent the individual buffered time ranges
+  for (i = 0; i < buffered.length; i++) {
+    start = buffered.start(i),
+    end = buffered.end(i),
+    part = children[i];
+
+    if (!part) {
+      part = this.el_.appendChild(vjs.createEl())
+    };
+
+    // set the percent based on the width of the progress bar (bufferedEnd)
+    part.style.left = percentify(start, bufferedEnd);
+    part.style.width = percentify(end - start, bufferedEnd);
+  };
+
+  // remove unused buffered range elements
+  for (i = children.length; i > buffered.length; i--) {
+    this.el_.removeChild(children[i-1]);
+  }
+};
 
 /**
  * Shows play progress
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
@@ -147,25 +182,42 @@ vjs.PlayProgressBar = vjs.Component.extend({
 vjs.PlayProgressBar.prototype.createEl = function(){
   return vjs.Component.prototype.createEl.call(this, 'div', {
     className: 'vjs-play-progress',
-    innerHTML: '<span class="vjs-control-text">Progress: 0%</span>'
+    innerHTML: '<span class="vjs-control-text"><span>' + this.localize('Progress') + '</span>: 0%</span>'
   });
 };
 
 /**
- * SeekBar component includes play progress bar, and seek handle
- * Needed so it can determine seek position based on handle position/size
+ * The Seek Handle shows the current position of the playhead during playback,
+ * and can be dragged to adjust the playhead.
+ *
  * @param {vjs.Player|Object} player
  * @param {Object=} options
  * @constructor
  */
-vjs.SeekHandle = vjs.SliderHandle.extend();
+vjs.SeekHandle = vjs.SliderHandle.extend({
+  init: function(player, options) {
+    vjs.SliderHandle.call(this, player, options);
+    player.on('timeupdate', vjs.bind(this, this.updateContent));
+  }
+});
 
-/** @inheritDoc */
+/**
+ * The default value for the handle content, which may be read by screen readers
+ *
+ * @type {String}
+ * @private
+ */
 vjs.SeekHandle.prototype.defaultValue = '00:00';
 
 /** @inheritDoc */
-vjs.SeekHandle.prototype.createEl = function(){
+vjs.SeekHandle.prototype.createEl = function() {
   return vjs.SliderHandle.prototype.createEl.call(this, 'div', {
-    className: 'vjs-seek-handle'
+    className: 'vjs-seek-handle',
+    'aria-live': 'off'
   });
+};
+
+vjs.SeekHandle.prototype.updateContent = function() {
+  var time = (this.player_.scrubbing) ? this.player_.getCache().currentTime : this.player_.currentTime();
+  this.el_.innerHTML = '<span class="vjs-control-text">' + vjs.formatTime(time, this.player_.duration()) + '</span>';
 };

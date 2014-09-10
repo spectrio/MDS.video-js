@@ -18,7 +18,11 @@
         "goog",
         "console",
 
-        "require",        
+        "require",
+        "define",
+        "module",
+        "exports",
+        "process",
 
         "PlayerTest",
         "asyncTest",
@@ -35,6 +39,7 @@
         "start",
         "stop",
         "strictEqual",
-        "test"
+        "test",
+        "sinon"
     ]
 }

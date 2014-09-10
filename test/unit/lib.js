@@ -41,6 +41,14 @@ test('should copy an object', function(){
   deepEqual(asdf,fdsa);
 });
 
+test('should check if an object is an Array', function(){
+  var arr = ['a', 'b', 'c'];
+  ok(vjs.obj.isArray(arr) === true, 'Arr object is an Array');
+
+  var obj = {};
+  ok(vjs.obj.isArray(obj) === false, 'Obj is not an Array');
+});
+
 test('should check if an object is plain', function(){
   var empty = {};
   ok(vjs.obj.isPlain(empty) === true, 'Empty object is plain');
@@ -105,15 +113,56 @@ test('should read tag attributes from elements, including HTML5 in all browsers'
 
   document.getElementById('qunit-fixture').innerHTML += tags;
 
-  var vid1Vals = vjs.getAttributeValues(document.getElementById('vid1'));
-  var vid2Vals = vjs.getAttributeValues(document.getElementById('vid2'));
-  var sourceVals = vjs.getAttributeValues(document.getElementById('source'));
-  var trackVals = vjs.getAttributeValues(document.getElementById('track'));
+  var vid1Vals = vjs.getElementAttributes(document.getElementById('vid1'));
+  var vid2Vals = vjs.getElementAttributes(document.getElementById('vid2'));
+  var sourceVals = vjs.getElementAttributes(document.getElementById('source'));
+  var trackVals = vjs.getElementAttributes(document.getElementById('track'));
 
-  deepEqual(vid1Vals, { 'autoplay': true, 'controls': true, 'data-test': 'asdf', 'data-empty-string': '', 'id': 'vid1', 'loop': true, 'muted': true, 'poster': 'http://www2.videojs.com/img/video-js-html5-video-player.png', 'preload': 'none', 'src': 'http://google.com' });
-  deepEqual(vid2Vals, { 'id': 'vid2' });
-  deepEqual(sourceVals, {'title': 'test', 'media': 'fdsa', 'type': 'video/mp4', 'src': 'http://google.com', 'id': 'source' });
-  deepEqual(trackVals, { 'default': true, /* IE no likey default key */ 'id': 'track', 'kind': 'captions', 'label': 'testlabel', 'src': 'http://google.com', 'srclang': 'en', 'title': 'test' });
+  // was using deepEqual, but ie8 would send all properties as attributes
+
+  // vid1
+  equal(vid1Vals['autoplay'], true);
+  equal(vid1Vals['controls'], true);
+  equal(vid1Vals['data-test'], 'asdf');
+  equal(vid1Vals['data-empty-string'], '');
+  equal(vid1Vals['id'], 'vid1');
+  equal(vid1Vals['loop'], true);
+  equal(vid1Vals['muted'], true);
+  equal(vid1Vals['poster'], 'http://www2.videojs.com/img/video-js-html5-video-player.png');
+  equal(vid1Vals['preload'], 'none');
+  equal(vid1Vals['src'], 'http://google.com');
+
+  // vid2
+  equal(vid2Vals['id'], 'vid2');
+
+  // sourceVals
+  equal(sourceVals['title'], 'test');
+  equal(sourceVals['media'], 'fdsa');
+  equal(sourceVals['type'], 'video/mp4');
+  equal(sourceVals['src'], 'http://google.com');
+  equal(sourceVals['id'], 'source');
+
+  // trackVals
+  equal(trackVals['default'], true);
+  equal(trackVals['id'], 'track');
+  equal(trackVals['kind'], 'captions');
+  equal(trackVals['label'], 'testlabel');
+  equal(trackVals['src'], 'http://google.com');
+  equal(trackVals['srclang'], 'en');
+  equal(trackVals['title'], 'test');
+});
+
+test('should set element attributes from object', function(){
+  var el, vid1Vals;
+
+  el = document.createElement('div');
+  el.id = 'el1';
+
+  vjs.setElementAttributes(el, { controls: true, 'data-test': 'asdf' });
+
+  equal(el.getAttribute('id'), 'el1');
+  equal(el.getAttribute('controls'), '');
+  equal(el.getAttribute('data-test'), 'asdf');
 });
 
 test('should get the right style values for an element', function(){
@@ -130,8 +179,10 @@ test('should get the right style values for an element', function(){
   el.style.height = '100%';
   el.style.width = '123px';
 
-  ok(vjs.getComputedDimension(el, 'height') === '1000px');
-  ok(vjs.getComputedDimension(el, 'width') === '123px');
+  // integer px values may get translated int very-close floats in Chrome/OS X
+  // so round the dimensions to ignore this
+  equal(Math.round(parseFloat(vjs.getComputedDimension(el, 'height'))), 1000, 'the computed height is equal');
+  equal(Math.round(parseFloat(vjs.getComputedDimension(el, 'width'))), 123, 'the computed width is equal');
 });
 
 test('should insert an element first in another', function(){
@@ -192,6 +243,14 @@ test('should format time as a string', function(){
   ok(vjs.formatTime(1,360000) === '0:00:01');
 });
 
+test('should format invalid times as dashes', function(){
+  equal(vjs.formatTime(Infinity, 90), '-:-');
+  equal(vjs.formatTime(NaN), '-:-');
+  // equal(vjs.formatTime(NaN, 216000), '-:--:--');
+  equal(vjs.formatTime(10, Infinity), '0:00:10');
+  equal(vjs.formatTime(90, NaN), '1:30');
+});
+
 test('should create a fake timerange', function(){
   var tr = vjs.createTimeRange(0, 10);
   ok(tr.start() === 0);
@@ -203,6 +262,16 @@ test('should get an absolute URL', function(){
   // ok(vjs.getAbsoluteURL('unit.html') === window.location.href);
   ok(vjs.getAbsoluteURL('http://asdf.com') === 'http://asdf.com');
   ok(vjs.getAbsoluteURL('https://asdf.com/index.html') === 'https://asdf.com/index.html');
+});
+
+test('should parse the details of a url correctly', function(){
+  equal(vjs.parseUrl('#').protocol, window.location.protocol, 'parsed relative url protocol');
+  equal(vjs.parseUrl('#').host, window.location.host, 'parsed relative url host');
+
+  equal(vjs.parseUrl('http://example.com').protocol, 'http:', 'parsed example url protocol');
+  equal(vjs.parseUrl('http://example.com').hostname, 'example.com', 'parsed example url hostname');
+
+  equal(vjs.parseUrl('http://example.com:1234').port, '1234', 'parsed example url port');
 });
 
 test('vjs.findPosition should find top and left position', function() {
@@ -221,4 +290,78 @@ test('vjs.findPosition should find top and left position', function() {
   d.getBoundingClientRect = null;
   position = vjs.findPosition(d);
   deepEqual(position, {left: 0, top: 0}, 'If there is no gBCR, we should get zeros');
+});
+
+// LOG TESTS
+test('should confirm logging functions work', function() {
+  var console, log, error, warn, origConsole, origLog, origWarn, origError;
+
+  origConsole = window['console'];
+  // replace the native console for testing
+  // in ie8 console.log is apparently not a 'function' so sinon chokes on it
+  // https://github.com/cjohansen/Sinon.JS/issues/386
+  // instead we'll temporarily replace them with no-op functions
+  console = window['console'] = {
+    log: function(){},
+    warn: function(){},
+    error: function(){}
+  };
+
+  // stub the global log functions
+  log = sinon.stub(console, 'log');
+  error = sinon.stub(console, 'error');
+  warn = sinon.stub(console, 'warn');
+
+  vjs.log('log1', 'log2');
+  vjs.log.warn('warn1', 'warn2');
+  vjs.log.error('error1', 'error2');
+
+  ok(log.called, 'log was called');
+  equal(log.firstCall.args[0], 'VIDEOJS:');
+  equal(log.firstCall.args[1], 'log1');
+  equal(log.firstCall.args[2], 'log2');
+
+  ok(warn.called, 'warn was called');
+  equal(warn.firstCall.args[0], 'VIDEOJS:');
+  equal(warn.firstCall.args[1], 'WARN:');
+  equal(warn.firstCall.args[2], 'warn1');
+  equal(warn.firstCall.args[3], 'warn2');
+
+  ok(error.called, 'error was called');
+  equal(error.firstCall.args[0], 'VIDEOJS:');
+  equal(error.firstCall.args[1], 'ERROR:');
+  equal(error.firstCall.args[2], 'error1');
+  equal(error.firstCall.args[3], 'error2');
+
+  ok(vjs.log.history.length === 3, 'there should be three messages in the log history');
+
+  // tear down sinon
+  log.restore();
+  error.restore();
+  warn.restore();
+
+  // restore the native console
+  window['console'] = origConsole;
+});
+
+test('should loop through each element of an array', function() {
+  expect(10);
+  var a = [1, 2, 3];
+  var sum = 0;
+  var i = 0;
+  var thisArg = {};
+
+  vjs.arr.forEach(a, function(item, iterator, array) {
+    sum += item;
+    deepEqual(array, a, 'The array arg should match the original array');
+    equal(i++, iterator, 'The indexes should match');
+    equal(this, thisArg, 'The context should equal the thisArg');
+  }, thisArg);
+  ok(sum, 6);
+
+  vjs.arr.forEach(a, function(){
+    if (this !== vjs) {
+      ok(false, 'default context should be vjs');
+    }
+  });
 });

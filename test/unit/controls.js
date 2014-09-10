@@ -9,13 +9,14 @@ test('should hide volume control if it\'s not supported', function(){
     id: noop,
     on: noop,
     ready: noop,
+    language: noop,
+    languages: noop,
     tech: {
-      features: {
-        volumeControl: false
-      }
+      'featuresVolumeControl': false
     },
     volume: function(){},
-    muted: function(){}
+    muted: function(){},
+    reportUserActivity: function(){}
   };
 
   volumeControl = new vjs.VolumeControl(player);
@@ -31,6 +32,8 @@ test('should test and toggle volume control on `loadstart`', function(){
   listeners = [];
   player = {
     id: noop,
+    language: noop,
+    languages: noop,
     on: function(event, callback){
       listeners.push(callback);
     },
@@ -42,10 +45,9 @@ test('should test and toggle volume control on `loadstart`', function(){
       return false;
     },
     tech: {
-      features: {
-        volumeControl: true
-      }
-    }
+      'featuresVolumeControl': true
+    },
+    reportUserActivity: function(){}
   };
 
   volumeControl = new vjs.VolumeControl(player);
@@ -56,7 +58,7 @@ test('should test and toggle volume control on `loadstart`', function(){
   ok(muteToggle.el().className.indexOf('vjs-hidden') < 0,
      'muteToggle is hidden initially');
 
-  player.tech.features.volumeControl = false;
+  player.tech['featuresVolumeControl'] = false;
   for (i = 0; i < listeners.length; i++) {
     listeners[i]();
   }
@@ -66,7 +68,7 @@ test('should test and toggle volume control on `loadstart`', function(){
   ok(muteToggle.el().className.indexOf('vjs-hidden') >= 0,
      'muteToggle does not hide itself');
 
-  player.tech.features.volumeControl = true;
+  player.tech['featuresVolumeControl'] = true;
   for (i = 0; i < listeners.length; i++) {
     listeners[i]();
   }
@@ -83,7 +85,8 @@ test('calculateDistance should use changedTouches, if available', function() {
   player = {
     id: noop,
     on: noop,
-    ready: noop
+    ready: noop,
+    reportUserActivity: noop
   };
   slider = new vjs.Slider(player);
   document.body.appendChild(slider.el_);
@@ -99,4 +102,13 @@ test('calculateDistance should use changedTouches, if available', function() {
   };
 
   equal(slider.calculateDistance(event), 0.5, 'we should have touched exactly in the center, so, the ratio should be half');
+});
+
+test('should hide playback rate control if it\'s not supported', function(){
+  expect(1);
+
+  var player = PlayerTest.makePlayer();
+  var playbackRate = new vjs.PlaybackRateMenuButton(player);
+
+  ok(playbackRate.el().className.indexOf('vjs-hidden') >= 0, 'playbackRate is not hidden');
 });

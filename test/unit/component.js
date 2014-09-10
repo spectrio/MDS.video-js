@@ -3,7 +3,8 @@ module('Component');
 var getFakePlayer = function(){
   return {
     // Fake player requries an ID
-    id: function(){ return 'player_1'; }
+    id: function(){ return 'player_1'; },
+    reportUserActivity: function(){}
   };
 };
 
@@ -25,7 +26,7 @@ test('should add a child component', function(){
   ok(comp.getChildById(child.id()) === child);
 });
 
-test('should init child coponents from options', function(){
+test('should init child components from options', function(){
   var comp = new vjs.Component(getFakePlayer(), {
     children: {
       'component': true
@@ -34,6 +35,32 @@ test('should init child coponents from options', function(){
 
   ok(comp.children().length === 1);
   ok(comp.el().childNodes.length === 1);
+});
+
+test('should init child components from simple children array', function(){
+  var comp = new vjs.Component(getFakePlayer(), {
+    children: [
+      'component',
+      'component',
+      'component'
+    ]
+  });
+
+  ok(comp.children().length === 3);
+  ok(comp.el().childNodes.length === 3);
+});
+
+test('should init child components from children array of objects', function(){
+  var comp = new vjs.Component(getFakePlayer(), {
+    children: [
+      { 'name': 'component' },
+      { 'name': 'component' },
+      { 'name': 'component' }
+    ]
+  });
+
+  ok(comp.children().length === 3);
+  ok(comp.el().childNodes.length === 3);
 });
 
 test('should do a deep merge of child options', function(){
@@ -82,8 +109,17 @@ test('should dispose of component and children', function(){
   var data = vjs.getData(comp.el());
   var id = comp.el()[vjs.expando];
 
+  var hasDisposed = false;
+  var bubbles = null;
+  comp.on('dispose', function(event){
+    hasDisposed = true;
+    bubbles = event.bubbles;
+  });
+
   comp.dispose();
 
+  ok(hasDisposed, 'component fired dispose event');
+  ok(bubbles === false, 'dispose event does not bubble');
   ok(!comp.children(), 'component children were deleted');
   ok(!comp.el(), 'component element was deleted');
   ok(!child.children(), 'child children were deleted');
@@ -163,6 +199,34 @@ test('should show and hide an element', function(){
   ok(comp.el().style.display === 'block');
 });
 
+test('dimension() should treat NaN and null as zero', function() {
+  var comp, width, height, newWidth, newHeight;
+  width = 300;
+  height = 150;
+
+  comp = new vjs.Component(getFakePlayer(), {}),
+  // set component dimension
+
+  comp.dimensions(width, height);
+
+  newWidth = comp.dimension('width', null);
+
+  notEqual(newWidth, width, 'new width and old width are not the same');
+  equal(newWidth, comp, 'we set a value, so, return value is component');
+  equal(comp.width(), 0, 'the new width is zero');
+
+  newHeight = comp.dimension('height', NaN);
+
+  notEqual(newHeight, height, 'new height and old height are not the same');
+  equal(newHeight, comp, 'we set a value, so, return value is component');
+  equal(comp.height(), 0, 'the new height is zero');
+
+  comp.width(width);
+  newWidth = comp.dimension('width', undefined);
+
+  equal(newWidth, width, 'we did not set the width with undefined');
+});
+
 test('should change the width and height of a component', function(){
   var container = document.createElement('div');
   var comp = new vjs.Component(getFakePlayer(), {});
@@ -216,4 +280,44 @@ test('should use a defined content el for appending children', function(){
   ok(comp.children().length === 0, 'Length should now be zero');
   ok(comp.el().childNodes[0]['id'] === 'contentEl', 'Content El should still exist');
   ok(comp.el().childNodes[0].childNodes[0] !== child.el(), 'Child el should be removed.');
+});
+
+test('should emit a tap event', function(){
+  expect(2);
+
+  // Fake touch support. Real touch support isn't needed for this test.
+  var origTouch = vjs.TOUCH_ENABLED;
+  vjs.TOUCH_ENABLED = true;
+
+  var comp = new vjs.Component(getFakePlayer());
+
+  comp.emitTapEvents();
+  comp.on('tap', function(){
+    ok(true, 'Tap event emitted');
+  });
+
+  // A touchstart followed by touchend should trigger a tap
+  vjs.trigger(comp.el(), {type: 'touchstart', touches: [{}]});
+  comp.trigger('touchend');
+
+  // A touchmove with a lot of movement should not trigger a tap
+  vjs.trigger(comp.el(), {type: 'touchstart', touches: [
+    { pageX: 0, pageY: 0 }
+  ]});
+  vjs.trigger(comp.el(), {type: 'touchmove', touches: [
+    { pageX: 100, pageY: 100 }
+  ]});
+  comp.trigger('touchend');
+
+  // A touchmove with not much movement should still allow a tap
+  vjs.trigger(comp.el(), {type: 'touchstart', touches: [
+    { pageX: 0, pageY: 0 }
+  ]});
+  vjs.trigger(comp.el(), {type: 'touchmove', touches: [
+    { pageX: 10, pageY: 10 }
+  ]});
+  comp.trigger('touchend');
+
+  // Reset to orignial value
+  vjs.TOUCH_ENABLED = origTouch;
 });
